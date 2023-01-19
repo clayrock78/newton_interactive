@@ -7,10 +7,9 @@ real_offset = 0
 imag_height = 2
 imag_offset = 0
 
-ITERATIONS = 5
-WIDTH = 1920
-HEIGHT = 1080
-FPS = 60
+ITERATIONS = 30
+WIDTH = 400
+HEIGHT = 300
 
 def distance_between(pos1, pos2):
     if type(pos1) == complex: pos1 = (pos1.real, pos1.imag)
@@ -43,7 +42,9 @@ BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
-COLORS = [WHITE, BLACK, RED, GREEN, BLUE]
+PURPLE = (255, 0, 255)
+YELLOW = (255, 255, 0)
+COLORS = [WHITE, RED, GREEN, BLUE, PURPLE, YELLOW]
 
 pg.init()
 screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -51,7 +52,7 @@ pg.display.set_caption("pygame template")
 clock = pg.time.Clock()
 
 
-roots = [Root(1,1,RED), Root(1,2,BLUE), Root(0,1,GREEN)]
+roots = []
 
 root_surface = pg.Surface((WIDTH, HEIGHT), pg.SRCALPHA)
 fractal_surface = pg.Surface((WIDTH, HEIGHT))
@@ -62,13 +63,18 @@ is_dragging_root = False
 current_root = None
 mouse_prev = (0,0)
 
+cur_col = 0
+
 running = True
 while running:
-
-    clock.tick(FPS)
     for event in pg.event.get():
         if event.type == pg.QUIT:
             running = False
+        if event.type == pg.MOUSEBUTTONDOWN:
+            if mouse.get_pressed()[2]:
+                real, imag = pix_to_complex(mouse.get_pos())
+                roots.append(Root(real, imag, COLORS[cur_col] ))
+                cur_col += 1
         if event.type == pg.KEYDOWN:
             if event.key == pg.K_ESCAPE:
                 running = False
