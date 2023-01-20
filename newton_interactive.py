@@ -1,14 +1,15 @@
 import pygame as pg
+import numpy as np
 import random
 from root import Root
 
-real_width = 2
+real_width = 5
 real_offset = 0
-imag_height = 2
+imag_height = 5
 imag_offset = 0
 
-ITERATIONS = 30
-WIDTH = 400
+ITERATIONS = 10
+WIDTH = 300
 HEIGHT = 300
 
 def distance_between(pos1, pos2):
@@ -30,7 +31,7 @@ def f(x):
     current = 1
     for root in roots:
         current *= (x - root.complex)
-    return complex(current)
+    return np.complex64(current)
 
 def f_prime(x):
     step = .000001
@@ -44,7 +45,7 @@ GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
 PURPLE = (255, 0, 255)
 YELLOW = (255, 255, 0)
-COLORS = [WHITE, RED, GREEN, BLUE, PURPLE, YELLOW]
+COLORS = [RED, GREEN, BLUE, PURPLE, YELLOW]
 
 pg.init()
 screen = pg.display.set_mode((WIDTH, HEIGHT))
@@ -79,14 +80,24 @@ while running:
             if event.key == pg.K_ESCAPE:
                 running = False
             if event.key == pg.K_SPACE:
-                fractal_surface_pa = pg.PixelArray(fractal_surface)
-                for x in range(WIDTH):
-                    for y in range(HEIGHT):
-                        c = complex(*pix_to_complex((x,y)))
-                        for _ in range(ITERATIONS):
-                            c = c - f(c)/f_prime(c)
-                        color = min(roots, key=lambda x:distance_between(x.complex, c)).color
-                        fractal_surface_pa[x,y] = color
+                # form 2 2D arrays to store the real and imag
+                x = np.linspace(real_offset, real_width, WIDTH)
+                y = np.linspace(imag_offset, imag_height, HEIGHT)
+                reals, imags = np.meshgrid(x,y)
+                c = np.complex64(pix_to_complex((reals,imags)))
+                for _ in range(ITERATIONS):
+                    c = c - f(c) / f_prime(c)
+                color_shape = list(c.shape)
+                color_shape[0] = 3
+                colors = np.zeros(color_shape, dtype=np.ndarray)
+                i = 0
+                for a in c[0]:
+                    color = min(roots, key=lambda x:distance_between(x.complex, a)).color
+                    colors[0][0][i] = color
+                    i+=1
+                print(colors)
+                #colors = [list(color) for color]
+                fractal_surface_pa = pg.surfarray.make_surface(colors)
                 fractal_surface_pa.close()
 
     #3 Draw/render
