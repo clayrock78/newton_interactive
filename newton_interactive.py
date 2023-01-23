@@ -13,8 +13,9 @@ WIDTH = 300
 HEIGHT = 300
 
 def distance_between(pos1, pos2):
-    if type(pos1) == complex: pos1 = (pos1.real, pos1.imag)
-    if type(pos2) == complex: pos2 = (pos2.real, pos2.imag)
+    return ((pos1.real - pos2.real)**2 + (pos1.imag - pos2.imag)**2)**.5
+
+def distance_between_tuples(pos1, pos2):
     return ((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)**.5
 
 def complex_to_pix(root:Root):
@@ -28,10 +29,10 @@ def pix_to_complex(pos):
     return x,y
 
 def f(x):
-    current = 1
+    current = np.full(x.shape, np.complex64(1))
     for root in roots:
         current *= (x - root.complex)
-    return np.complex64(current)
+    return current
 
 def f_prime(x):
     step = .000001
@@ -85,20 +86,32 @@ while running:
                 y = np.linspace(imag_offset, imag_height, HEIGHT)
                 reals, imags = np.meshgrid(x,y)
                 c = np.complex64(pix_to_complex((reals,imags)))
+                print(c.shape)
                 for _ in range(ITERATIONS):
                     c = c - f(c) / f_prime(c)
-                color_shape = list(c.shape)
-                color_shape[0] = 3
-                colors = np.zeros(color_shape, dtype=np.ndarray)
-                i = 0
-                for a in c[0]:
-                    color = min(roots, key=lambda x:distance_between(x.complex, a)).color
-                    colors[0][0][i] = color
-                    i+=1
-                print(colors)
-                #colors = [list(color) for color]
-                fractal_surface_pa = pg.surfarray.make_surface(colors)
-                fractal_surface_pa.close()
+                
+                color_shape = [300,300,3]
+                colors = np.zeros(color_shape)
+                nearest_color = np.empty((300,300,3))
+                nearest_distance = np.zeros(color_shape[:-1])*1000
+                for root in roots:
+                    distance = distance_between(c, np.full(c.shape,root.complex))
+                    distance = np.hypot(distance[0], distance[1])
+                    print(distance.shape)
+                    mask = np.greater(nearest_distance, distance)
+                    nearest_distance = np.where(mask, distance, nearest_distance)
+                    nearest_color = np.where(mask, np.full((300,300,3),np.array(root.color)), nearest_color)
+                        # nearest_distance = distance
+                        # nearest_root = root
+                
+
+                # for indx, x in enumerate(c):
+                #     for indy, y in enumerate(x):
+                #         for ind, comp in enumerate(y):
+                #             color = np.array(list(min(roots, key=lambda x:distance_between(x.complex, comp)).color))
+                #             colors[indy][indx] = color
+                #print(colors)
+                fractal_surface = pg.surfarray.make_surface(nearest_color)
 
     #3 Draw/render
     screen.fill(BLACK)
@@ -115,7 +128,7 @@ while running:
                 root.complex = c
                 root.real = c.real
                 root.imag = c.imag
-            if distance_between(mouse.get_pos(), root_pos) <= root.radius:                
+            if distance_between_tuples(mouse.get_pos(), root_pos) <= root.radius:                
                 is_dragging_root = True
                 current_root = root   
         else:
