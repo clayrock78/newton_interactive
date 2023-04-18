@@ -86,23 +86,20 @@ while running:
                 y = np.linspace(imag_offset, imag_height, HEIGHT)
                 reals, imags = np.meshgrid(x,y)
                 c = np.complex64(pix_to_complex((reals,imags)))
-                print(c.shape)
-                for _ in range(ITERATIONS):
-                    c = c - f(c) / f_prime(c)
+                #print(c.shape)
+                #for _ in range(ITERATIONS):
+                #    c = c - f(c) / f_prime(c)
                 
                 color_shape = [300,300,3]
-                colors = np.zeros(color_shape)
                 nearest_color = np.empty((300,300,3))
-                nearest_distance = np.zeros(color_shape[:-1])*1000
+                nearest_distance = np.full((300,300), np.inf)
+                print(c.shape)
                 for root in roots:
-                    distance = distance_between(c, np.full(c.shape,root.complex))
-                    distance = np.hypot(distance[0], distance[1])
-                    print(distance.shape)
+                    distance = distance_between(c[0], np.full(c[0].shape,root.complex))
                     mask = np.greater(nearest_distance, distance)
                     nearest_distance = np.where(mask, distance, nearest_distance)
+                    mask.shape = (300,300,1)
                     nearest_color = np.where(mask, np.full((300,300,3),np.array(root.color)), nearest_color)
-                        # nearest_distance = distance
-                        # nearest_root = root
                 
 
                 # for indx, x in enumerate(c):
