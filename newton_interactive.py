@@ -117,6 +117,14 @@ def render(scale=None):
         for event in pg.event.get():
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 return
+        
+        # draw progress bar
+        if scale <= 5:
+            print(scale)
+            progress = i / ITERATIONS
+            pg.draw.rect(screen, (255, 255, 255), (4*WIDTH/5, 0, WIDTH/5 * progress, 20), border_radius=5)
+            pg.draw.rect(screen, (0, 0, 0), (4*WIDTH/5, 0, WIDTH/5, 20), width=5, border_radius=5)
+            pg.display.flip()
 
     tcolors = np.swapaxes(colors, 0, 1)
     fractal_surface = pg.surfarray.make_surface(tcolors)
@@ -258,7 +266,7 @@ while running:
                         zoom_rect.bottomright).imag - pix_to_complex(zoom_rect.topleft).imag)
 
                     mode = "zoom"
-                    render()
+                    render(scale=5)
         if event.type == pg.KEYDOWN:
             if event.key == pg.K_UP:
                 imag_offset -= imag_height * .1
@@ -477,10 +485,6 @@ while running:
 
     # display fps
     clock.tick()
-    fps = clock.get_fps()
-    text = large_font.render(f"FPS: {fps:.2f}", True, (255, 255, 255))
-    screen.blit(text, (WIDTH - text.get_width(), 0))
-
     pg.display.flip()
 
 pg.quit()
