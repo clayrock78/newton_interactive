@@ -86,7 +86,8 @@ def render(scale=None):
             f(c[not_calculated]) / f_prime(c[not_calculated])
         for root in roots:
             # if the root is close enough, set the color (only for non-calculated points)
-            distances[not_calculated] = np.abs(c[not_calculated] - root.complex)
+            distances[not_calculated] = np.abs(
+                c[not_calculated] - root.complex)
             mask[not_calculated] = distances[not_calculated] < 1e-3
             color_mask = np.logical_and(mask, not_calculated)
             # make the color darker based on how many iterations it took to find the root
@@ -94,14 +95,15 @@ def render(scale=None):
                 colors[color_mask] = np.array(root.color)
             elif method == "colored_TE":
                 colors[color_mask] = (np.array((root.color)) *
-                                (1-(i / ITERATIONS)**.75))
+                                      (1-(i / ITERATIONS)**.75))
             elif method == "uncolored_TE":
                 # alternate coloring method
                 colors[color_mask] = np.array((i / ITERATIONS * 255, 0, 0))
             elif method == "colored_DE":
                 # escape method based on distance when escaped
-                colors[color_mask] = np.array(distances.shape, root.color) * (1 - (distances[color_mask] / 1e-3)**.75)
-            
+                colors[color_mask] = np.array(
+                    distances.shape, root.color) * (1 - (distances[color_mask] / 1e-3)**.75)
+
             calculated[mask] = True
 
         if active and not is_dragging_root:
@@ -117,20 +119,23 @@ def render(scale=None):
         for event in pg.event.get():
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 return
-        
-        # draw progress bar
+
+        # draw progress bar for larger renders
         if scale <= 5:
-            print(scale)
-            progress = i / ITERATIONS
-            pg.draw.rect(screen, (255, 255, 255), (4*WIDTH/5, 0, WIDTH/5 * progress, 20), border_radius=5)
-            pg.draw.rect(screen, (0, 0, 0), (4*WIDTH/5, 0, WIDTH/5, 20), width=5, border_radius=5)
+            progress = calculated.sum() / calculated.size
+            pg.draw.rect(screen, (255, 255, 255),
+                         (4*WIDTH/5+5, 0, (WIDTH/5-10) * progress, 20))
+            pg.draw.rect(screen, (0, 0, 0), (4*WIDTH/5, 0,
+                         WIDTH/5, 20), width=5, border_radius=5)
             pg.display.flip()
 
     tcolors = np.swapaxes(colors, 0, 1)
     fractal_surface = pg.surfarray.make_surface(tcolors)
-    scaled_fractal_surface = pg.transform.scale(fractal_surface, (WIDTH, HEIGHT))
+    scaled_fractal_surface = pg.transform.scale(
+        fractal_surface, (WIDTH, HEIGHT))
 
-def hsv_to_rgb(h,s,v):
+
+def hsv_to_rgb(h, s, v):
     # hue is in degrees
     # saturation and value are percentages
     # returns a tuple of rgb values
@@ -154,6 +159,7 @@ def hsv_to_rgb(h,s,v):
         r, g, b = c, 0, x
     return int((r + m) * 255), int((g + m) * 255), int((b + m) * 255)
 
+
 def color_picker():
     global screen, mouse
     # alternative game loop that lets the user pick a color
@@ -175,28 +181,31 @@ def color_picker():
         # make a box at the bottom of the screen for the hue slider
         for hue in range(360):
             line_width = WIDTH / 360
-            pg.draw.line(screen, hsv_to_rgb(hue, cur_sat, cur_val), (hue*line_width, HEIGHT - 45), (hue*line_width, HEIGHT+7), width=int(line_width+.5)+1)
+            pg.draw.line(screen, hsv_to_rgb(hue, cur_sat, cur_val), (hue*line_width,
+                         HEIGHT - 45), (hue*line_width, HEIGHT+7), width=int(line_width+.5)+1)
             # if the mouse is clicking on the hue slider
             if mouse.get_pressed()[0] and HEIGHT - 45 <= mouse.get_pos()[1] <= HEIGHT + 7:
                 cur_hue = mouse.get_pos()[0] / line_width
                 cur_hue = cur_hue % 360
-                pg.draw.rect(screen, (200,200,200), (cur_hue*line_width, HEIGHT - 45, line_width, 50), width=5, border_radius=5)
-        pg.draw.rect(screen, (255,255,255), (0, HEIGHT - 50, WIDTH, 50), width=5, border_radius=5)
+                pg.draw.rect(screen, (200, 200, 200), (cur_hue*line_width,
+                             HEIGHT - 45, line_width, 50), width=5, border_radius=5)
+        pg.draw.rect(screen, (255, 255, 255), (0, HEIGHT -
+                     50, WIDTH, 50), width=5, border_radius=5)
         # saturation-val picker square
-        pg.draw.rect(screen, (0,0,0), (0, 0, WIDTH/5, WIDTH/5))
+        pg.draw.rect(screen, (0, 0, 0), (0, 0, WIDTH/5, WIDTH/5))
         for sat in range(100):
             for val in range(100):
-                pg.draw.rect(screen, hsv_to_rgb(cur_hue, sat, val), (sat*WIDTH/500+WIDTH/3, val*WIDTH/500, WIDTH/500+1, WIDTH/500+1))
+                pg.draw.rect(screen, hsv_to_rgb(cur_hue, sat, val), (sat *
+                             WIDTH/500+WIDTH/3, val*WIDTH/500, WIDTH/500+1, WIDTH/500+1))
         # if mouse is clicking in color picker box
         if mouse.get_pressed()[0] and WIDTH/3 <= mouse.get_pos()[0] <= WIDTH/3 + WIDTH/5 and 0 <= mouse.get_pos()[1] <= WIDTH/5:
             cur_sat = (mouse.get_pos()[0] - WIDTH/3) / (WIDTH/5) * 100
             cur_val = (mouse.get_pos()[1]) / (WIDTH/5) * 100
         # display the color
-        pg.draw.rect(screen, hsv_to_rgb(cur_hue, cur_sat, cur_val), (0, 0, WIDTH/5, WIDTH/5))
+        pg.draw.rect(screen, hsv_to_rgb(cur_hue, cur_sat,
+                     cur_val), (0, 0, WIDTH/5, WIDTH/5))
 
         pg.display.flip()
-
-
 
 
 # define a long list of colors
@@ -348,7 +357,8 @@ while running:
                 render(scale=10)
             if mode == "roots" and event.key == pg.K_v:
                 # change color at pos in list to random color
-                color = (random.randint(50, 255), random.randint(50, 255), random.randint(50, 255))
+                color = (random.randint(50, 255), random.randint(
+                    50, 255), random.randint(50, 255))
                 # if mouse is close enough to root, change color of that root
                 for root in roots:
                     if distance_between_tuples(mouse.get_pos(), complex_to_pix(root)) < root.radius:
@@ -376,14 +386,14 @@ while running:
                         render(scale=5)
                         break
 
-
     # 3 Draw/render
-    #screen.fill(BLACK)
+    # screen.fill(BLACK)
     root_surface.fill((0, 0, 0, 0))
 
     if mode == "roots":
         # display the color of current root in bottom right
-        pg.draw.rect(root_surface, COLORS[cur_col], (WIDTH-50, HEIGHT-50, 50, 50))
+        pg.draw.rect(root_surface, COLORS[cur_col],
+                     (WIDTH-50, HEIGHT-50, 50, 50))
 
     for root in roots:
         root_pos = complex_to_pix(root)
