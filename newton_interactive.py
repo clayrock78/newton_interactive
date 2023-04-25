@@ -45,35 +45,39 @@ def f(x):
 
 
 def f_prime(x):
-    # returns the derivative of f(x) where x is a polynomial
+    # returns the derivative of f(x) where f is a polynomial
     current = np.full(x.shape, np.complex128(0))
     for root in roots:
         current += f(x) / (x - root.complex)
     return current
 
 
-global fractal_surface
+global fractal_surface, scaled_fractal_surface
 active = False
 
 
-def render():
-    global fractal_surface
+def render(scale=None):
+    global fractal_surface, scaled_fractal_surface
     # display "rendering" to the user
     text = large_font.render(
-        "Rendering, please wait...", True, (255, 255, 255))
+        "Rendering, please wait... (space to cancel)", True, (255, 255, 255))
     screen.blit(text, (WIDTH/2 - text.get_width() /
                 2, HEIGHT/2 - text.get_height()/2))
     pg.display.flip()
 
     # form 2 2D arrays to store the real and imag
-    res_width = int(WIDTH / res_scale)
-    res_height = int(HEIGHT / res_scale)
+    if scale is None:
+        scale = res_scale
+    res_width = int(WIDTH / scale)
+    res_height = int(HEIGHT / scale)
     x = np.linspace(real_offset, real_offset + real_width, res_width)
     y = np.linspace(imag_offset, imag_offset + imag_height, res_height)
     reals, imags = np.meshgrid(x, y)
     c = np.complex128(reals + 1j*imags)
     colors = np.zeros((res_height, res_width, 3), dtype=np.uint8)
     calculated = np.zeros((res_height, res_width), dtype=bool)
+    mask = np.zeros((res_height, res_width), dtype=bool)
+    distances = np.zeros((res_height, res_width), dtype=np.float64)
 
     # calculate the fractal
     for i in range(ITERATIONS):
@@ -82,17 +86,25 @@ def render():
             f(c[not_calculated]) / f_prime(c[not_calculated])
         for root in roots:
             # if the root is close enough, set the color (only for non-calculated points)
-            mask = (c.real - root.real)**2 + (c.imag - root.imag)**2 < .001
-            mask = np.logical_and(mask, not_calculated)
+            distances[not_calculated] = np.abs(c[not_calculated] - root.complex)
+            mask[not_calculated] = distances[not_calculated] < 1e-3
+            color_mask = np.logical_and(mask, not_calculated)
             # make the color darker based on how many iterations it took to find the root
-            if simple:
-                colors[mask] = np.array(root.color)
-            else:
-                colors[mask] = (np.array(root.color) *
+            if method == "colored_simple":
+                colors[color_mask] = np.array(root.color)
+            elif method == "colored_TE":
+                colors[color_mask] = (np.array((root.color)) *
                                 (1-(i / ITERATIONS)**.75))
+            elif method == "uncolored_TE":
+                # alternate coloring method
+                colors[color_mask] = np.array((i / ITERATIONS * 255, 0, 0))
+            elif method == "colored_DE":
+                # escape method based on distance when escaped
+                colors[color_mask] = np.array(distances.shape, root.color) * (1 - (distances[color_mask] / 1e-3)**.75)
+            
             calculated[mask] = True
 
-        if active:
+        if active and not is_dragging_root:
             # draw the fractal to fractal_surface as pixelarray
             # swap axes
             tcolors = np.swapaxes(colors, 0, 1)
@@ -102,9 +114,81 @@ def render():
             screen.blit(fractal_surface, (0, 0))
             pg.display.flip()
 
+        for event in pg.event.get():
+            if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
+                return
+
     tcolors = np.swapaxes(colors, 0, 1)
     fractal_surface = pg.surfarray.make_surface(tcolors)
-    fractal_surface = pg.transform.scale(fractal_surface, (WIDTH, HEIGHT))
+    scaled_fractal_surface = pg.transform.scale(fractal_surface, (WIDTH, HEIGHT))
+
+def hsv_to_rgb(h,s,v):
+    # hue is in degrees
+    # saturation and value are percentages
+    # returns a tuple of rgb values
+    h = h % 360
+    s /= 100
+    v /= 100
+    c = v * s
+    x = c * (1 - abs((h / 60) % 2 - 1))
+    m = v - c
+    if 0 <= h < 60:
+        r, g, b = c, x, 0
+    elif 60 <= h < 120:
+        r, g, b = x, c, 0
+    elif 120 <= h < 180:
+        r, g, b = 0, c, x
+    elif 180 <= h < 240:
+        r, g, b = 0, x, c
+    elif 240 <= h < 300:
+        r, g, b = x, 0, c
+    elif 300 <= h < 360:
+        r, g, b = c, 0, x
+    return int((r + m) * 255), int((g + m) * 255), int((b + m) * 255)
+
+def color_picker():
+    global screen, mouse
+    # alternative game loop that lets the user pick a color
+    cur_hue = 0
+    cur_sat = 100
+    cur_val = 100
+    running = True
+    while running:
+        for event in pg.event.get():
+            if event.type == pg.QUIT:
+                return
+            if event.type == pg.MOUSEBUTTONDOWN:
+                pass
+            if event.type == pg.KEYDOWN:
+                if event.key == pg.K_ESCAPE or event.key == pg.K_SPACE:
+                    return hsv_to_rgb(cur_hue, cur_sat, cur_val)
+        # display a color picker
+        # hue picker slider
+        # make a box at the bottom of the screen for the hue slider
+        for hue in range(360):
+            line_width = WIDTH / 360
+            pg.draw.line(screen, hsv_to_rgb(hue, cur_sat, cur_val), (hue*line_width, HEIGHT - 45), (hue*line_width, HEIGHT+7), width=int(line_width+.5)+1)
+            # if the mouse is clicking on the hue slider
+            if mouse.get_pressed()[0] and HEIGHT - 45 <= mouse.get_pos()[1] <= HEIGHT + 7:
+                cur_hue = mouse.get_pos()[0] / line_width
+                cur_hue = cur_hue % 360
+                pg.draw.rect(screen, (200,200,200), (cur_hue*line_width, HEIGHT - 45, line_width, 50), width=5, border_radius=5)
+        pg.draw.rect(screen, (255,255,255), (0, HEIGHT - 50, WIDTH, 50), width=5, border_radius=5)
+        # saturation-val picker square
+        pg.draw.rect(screen, (0,0,0), (0, 0, WIDTH/5, WIDTH/5))
+        for sat in range(100):
+            for val in range(100):
+                pg.draw.rect(screen, hsv_to_rgb(cur_hue, sat, val), (sat*WIDTH/500+WIDTH/3, val*WIDTH/500, WIDTH/500+1, WIDTH/500+1))
+        # if mouse is clicking in color picker box
+        if mouse.get_pressed()[0] and WIDTH/3 <= mouse.get_pos()[0] <= WIDTH/3 + WIDTH/5 and 0 <= mouse.get_pos()[1] <= WIDTH/5:
+            cur_sat = (mouse.get_pos()[0] - WIDTH/3) / (WIDTH/5) * 100
+            cur_val = (mouse.get_pos()[1]) / (WIDTH/5) * 100
+        # display the color
+        pg.draw.rect(screen, hsv_to_rgb(cur_hue, cur_sat, cur_val), (0, 0, WIDTH/5, WIDTH/5))
+
+        pg.display.flip()
+
+
 
 
 # define a long list of colors
@@ -112,6 +196,7 @@ COLORS = [(random.randint(50, 255), random.randint(50, 255),
            random.randint(50, 255)) for _ in range(100)]
 BLACK = (0, 0, 0)
 
+global screen, mouse
 pg.init()
 screen = pg.display.set_mode((WIDTH, HEIGHT))
 pg.display.set_caption("pygame template")
@@ -120,11 +205,13 @@ clock = pg.time.Clock()
 roots = []
 root_surface = pg.Surface((WIDTH, HEIGHT), pg.SRCALPHA)
 fractal_surface = pg.Surface((WIDTH, HEIGHT))
+scaled_fractal_surface = pg.Surface((WIDTH, HEIGHT))
 
-res_scale = 2
+res_scale = 1
 
 mouse = pg.mouse
-simple = False
+methods = ["colored_simple", "colored_TE", "uncolored_TE"]
+method = methods[1]
 
 is_dragging_root = False
 current_root = None
@@ -148,10 +235,10 @@ while running:
                     c = pix_to_complex(mouse.get_pos())
                     real, imag = c.real, c.imag
                     roots.append(Root(real, imag, len(roots), COLORS[cur_col]))
+                    render(scale=10)
                     cur_col += 1
                 elif mode == "zooming":
                     mode = "zoom"
-
             if mouse.get_pressed()[0]:
                 if mode == "zoom":
                     mouse_prev = mouse.get_pos()
@@ -175,16 +262,16 @@ while running:
         if event.type == pg.KEYDOWN:
             if event.key == pg.K_UP:
                 imag_offset -= imag_height * .1
-                render()
+                render(scale=10)
             if event.key == pg.K_DOWN:
                 imag_offset += imag_height * .1
-                render()
+                render(scale=10)
             if event.key == pg.K_LEFT:
                 real_offset -= real_width * .1
-                render()
+                render(scale=10)
             if event.key == pg.K_RIGHT:
                 real_offset += real_width * .1
-                render()
+                render(scale=10)
             if event.key == pg.K_ESCAPE:
                 running = False
             if event.key == pg.K_SPACE:
@@ -212,7 +299,6 @@ while running:
                 render()
                 pg.image.save(fractal_surface, filename)
                 res_scale, ITERATIONS = temp
-                render()
             if event.key == pg.K_u:
                 ITERATIONS += 1
                 print(ITERATIONS)
@@ -220,8 +306,9 @@ while running:
                 ITERATIONS -= 1
                 print(ITERATIONS)
             if event.key == pg.K_l:
-                simple = not simple
-                print(simple)
+                # change coloring method to next in list
+                method = methods[(methods.index(method) + 1) % len(methods)]
+                render(scale=5)
             if event.key == pg.K_z:
                 mode = "zoom"
             if event.key == pg.K_c:
@@ -235,10 +322,60 @@ while running:
                     mode = "controls"
                 else:
                     mode = "roots"
+            if event.key == pg.K_q:
+                active = not active
+            if event.key == pg.K_PAGEUP:
+                # zoom in the bounds
+                real_offset += real_width * .1
+                imag_offset += imag_height * .1
+                real_width *= .8
+                imag_height *= .8
+                render(scale=10)
+            if event.key == pg.K_PAGEDOWN:
+                # zoom out the bounds
+                real_offset -= real_width * .1
+                imag_offset -= imag_height * .1
+                real_width *= 1.2
+                imag_height *= 1.2
+                render(scale=10)
+            if mode == "roots" and event.key == pg.K_v:
+                # change color at pos in list to random color
+                color = (random.randint(50, 255), random.randint(50, 255), random.randint(50, 255))
+                # if mouse is close enough to root, change color of that root
+                for root in roots:
+                    if distance_between_tuples(mouse.get_pos(), complex_to_pix(root)) < root.radius:
+                        root.color = color
+                        render(scale=5)
+                        break
+                else:
+                    # if no root is close enough, change color of next root
+                    COLORS[cur_col] = color
+            if mode == "roots" and event.key == pg.K_b:
+                # set the closest root to the color chosen by color picker
+                for root in roots:
+                    if distance_between_tuples(mouse.get_pos(), complex_to_pix(root)) < root.radius:
+                        root.color = color_picker()
+                        render(scale=5)
+                        break
+                else:
+                    # if no root is close enough, set next root to color chosen by color picker
+                    COLORS[cur_col] = color_picker()
+            if mode == "roots" and event.key == pg.K_BACKSPACE:
+                # delete the root at the mouse position
+                for root in roots:
+                    if distance_between_tuples(mouse.get_pos(), complex_to_pix(root)) < root.radius:
+                        roots.remove(root)
+                        render(scale=5)
+                        break
+
 
     # 3 Draw/render
-    screen.fill(BLACK)
+    #screen.fill(BLACK)
     root_surface.fill((0, 0, 0, 0))
+
+    if mode == "roots":
+        # display the color of current root in bottom right
+        pg.draw.rect(root_surface, COLORS[cur_col], (WIDTH-50, HEIGHT-50, 50, 50))
 
     for root in roots:
         root_pos = complex_to_pix(root)
@@ -254,11 +391,14 @@ while running:
             if distance_between_tuples(mouse.get_pos(), root_pos) <= root.radius:
                 is_dragging_root = True
                 current_root = root
+                render(scale=20)
         else:
+            if is_dragging_root:
+                render(scale=3)
             is_dragging_root = False
             current_root = None
 
-    screen.blit(fractal_surface, (0, 0))
+    screen.blit(scaled_fractal_surface, (0, 0))
     screen.blit(root_surface, (0, 0))
 
     # if mode is zooming, draw a square to show the user what they are zooming to
@@ -282,7 +422,7 @@ while running:
 
     # write current iterations to top left of screen
     text = large_font.render(
-        f"Iterations: {ITERATIONS} Simple Mode:{simple} Resolution Scale:{res_scale} {'Active Mode On' if active else ''}", True, (255, 255, 255))
+        f"Iterations: {ITERATIONS} Coloring Mode:{method} Resolution Scale:{res_scale} {'Active Mode On' if active else ''}", True, (255, 255, 255))
     screen.blit(text, (0, 0))
 
     if mode == "zoom":
@@ -297,14 +437,14 @@ while running:
         explanation = """
         Welcome to the Newton Fractal Generator!
 
-        Zoom Mode (z)
+        Precision Zoom Mode (z)
             Allows you to zoom in on the fractal with left click
 
         Root Mode (c)
             Move roots with left click
             Place roots with right click
 
-        Panning (arrow keys)
+        Panning and increment zooming (arrow keys and pg up/down)
             Move the fractal around
 
         Increase/Decrease Iterations (u/j)
@@ -334,6 +474,12 @@ while running:
             text_rect.center = (WIDTH/2, 0)
             text_rect.y += i * text.get_height()
             screen.blit(text, text_rect)
+
+    # display fps
+    clock.tick()
+    fps = clock.get_fps()
+    text = large_font.render(f"FPS: {fps:.2f}", True, (255, 255, 255))
+    screen.blit(text, (WIDTH - text.get_width(), 0))
 
     pg.display.flip()
 
