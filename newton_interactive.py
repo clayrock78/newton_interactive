@@ -437,8 +437,9 @@ while running:
         explanation = """
         Welcome to the Newton Fractal Generator!
 
-        Precision Zoom Mode (z)
-            Allows you to zoom in on the fractal with left click
+        Precision Zoom Mode (z): Allows you to zoom in on the fractal with left click
+
+        Random Color (v) and Color Picker (b): Change the color of the root the mouse is on or the next root you place
 
         Root Mode (c)
             Move roots with left click
@@ -455,8 +456,8 @@ while running:
             Using this with high values will allow you to generate low resolution images quickly
             Conversely, using this with low values will allow you to generate high resolution images slowly
 
-        Toggle Simple Mode (l)
-            Makes rendering slightly faster and changes style
+        Change Coloring Method (m)
+            Changes the coloring method to change the style (more styles to come)
 
         Save Image (s)
             Saves the current image to a file
@@ -466,7 +467,6 @@ while running:
             Resets the fractal to its default state and changes root colors
 
         Quit (esc)
-            Quits the program
         """
         for i, line in enumerate(explanation.split("\n")):
             text = large_font.render(line, True, (255, 255, 255))
