@@ -81,6 +81,8 @@ def render(scale=None):
 
     # calculate the fractal
     for i in range(ITERATIONS):
+        if calculated.all():
+            break
         not_calculated = np.logical_not(calculated)
         c[not_calculated] = c[not_calculated] - \
             f(c[not_calculated]) / f_prime(c[not_calculated])
@@ -88,7 +90,7 @@ def render(scale=None):
             # if the root is close enough, set the color (only for non-calculated points)
             distances[not_calculated] = np.abs(
                 c[not_calculated] - root.complex)
-            mask[not_calculated] = distances[not_calculated] < 1e-3
+            mask[not_calculated] = distances[not_calculated] < 4e-2
             color_mask = np.logical_and(mask, not_calculated)
             # make the color darker based on how many iterations it took to find the root
             if method == "colored_simple":
@@ -101,8 +103,24 @@ def render(scale=None):
                 colors[color_mask] = np.array((i / ITERATIONS * 255, 0, 0))
             elif method == "colored_DE":
                 # escape method based on distance when escaped
-                colors[color_mask] = np.array(
-                    distances.shape, root.color) * (1 - (distances[color_mask] / 1e-3)**.75)
+                # for each point, multiply the root color  by 1/iterations + distance/.001, reshaping them to make it work
+                color_full = np.full((distances[color_mask].shape[0],3), np.array(root.color))
+                colors[color_mask] = color_full * (1-((i+\
+                    np.reshape(\
+                        ((distances[color_mask])/4e-2),\
+                        (distances[color_mask].shape[0],1)
+                        )\
+                    ))/ITERATIONS)**2
+                #colors[color_mask] = np.array(root.color)
+            elif method == "uncolored_DE":
+                # alternate coloring method
+                color_full = np.full((distances[color_mask].shape[0],3), np.array((255,0,0)))
+                colors[color_mask] = color_full / (1-((i+\
+                    np.reshape(\
+                        ((distances[color_mask])/4e-2),\
+                        (distances[color_mask].shape[0],1)
+                        )\
+                    ))/ITERATIONS)**2            
 
             calculated[mask] = True
 
@@ -159,13 +177,37 @@ def hsv_to_rgb(h, s, v):
         r, g, b = c, 0, x
     return int((r + m) * 255), int((g + m) * 255), int((b + m) * 255)
 
+def rgb_to_hsv(r,g,b):
+    # hue is in degrees
+    # saturation and value are percentages
+    # returns a tuple of rgb values
+    r /= 255
+    g /= 255
+    b /= 255
+    cmax = max(r,g,b)
+    cmin = min(r,g,b)
+    delta = cmax - cmin
+    if delta == 0:
+        hue = 0
+    elif cmax == r:
+        hue = 60 * (((g-b)/delta) % 6)
+    elif cmax == g:
+        hue = 60 * (((b-r)/delta) + 2)
+    elif cmax == b:
+        hue = 60 * (((r-g)/delta) + 4)
+    if cmax == 0:
+        sat = 0
+    else:
+        sat = delta / cmax
+    val = cmax
+    return hue, sat*100, val*100
 
-def color_picker():
+
+def color_picker(RGB=(255, 0, 0)):
     global screen, mouse
     # alternative game loop that lets the user pick a color
-    cur_hue = 0
-    cur_sat = 100
-    cur_val = 100
+    cur_hue, cur_sat, cur_val = rgb_to_hsv(*RGB)
+
     running = True
     while running:
         for event in pg.event.get():
@@ -174,8 +216,10 @@ def color_picker():
             if event.type == pg.MOUSEBUTTONDOWN:
                 pass
             if event.type == pg.KEYDOWN:
-                if event.key == pg.K_ESCAPE or event.key == pg.K_SPACE:
+                if event.key == pg.K_SPACE:
                     return hsv_to_rgb(cur_hue, cur_sat, cur_val)
+                if event.key == pg.K_ESCAPE:
+                    return RGB
         # display a color picker
         # hue picker slider
         # make a box at the bottom of the screen for the hue slider
@@ -227,7 +271,7 @@ scaled_fractal_surface = pg.Surface((WIDTH, HEIGHT))
 res_scale = 1
 
 mouse = pg.mouse
-methods = ["colored_simple", "colored_TE", "uncolored_TE"]
+methods = ["colored_simple", "colored_TE", "uncolored_TE", "colored_DE", "uncolored_DE"]
 method = methods[1]
 
 is_dragging_root = False
@@ -236,8 +280,8 @@ mouse_prev = (0, 0)
 
 cur_col = 0
 
-font = pg.font.SysFont("Arial", 20)
-large_font = pg.font.SysFont("Arial", 28)
+font = pg.font.SysFont("Calibri", 20)
+large_font = pg.font.SysFont("Calibri", 28)
 
 mode = "roots"
 
@@ -322,7 +366,7 @@ while running:
             if event.key == pg.K_j:
                 ITERATIONS -= 1
                 print(ITERATIONS)
-            if event.key == pg.K_l:
+            if event.key == pg.K_m:
                 # change coloring method to next in list
                 method = methods[(methods.index(method) + 1) % len(methods)]
                 render(scale=5)
@@ -372,7 +416,7 @@ while running:
                 # set the closest root to the color chosen by color picker
                 for root in roots:
                     if distance_between_tuples(mouse.get_pos(), complex_to_pix(root)) < root.radius:
-                        root.color = color_picker()
+                        root.color = color_picker(root.color)
                         render(scale=5)
                         break
                 else:
