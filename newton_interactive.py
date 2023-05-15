@@ -1,7 +1,10 @@
 import pygame as pg
 import numpy as np
 import random
+import numexpr
+from time import perf_counter
 from root import Root
+
 
 ITERATIONS = 30
 WIDTH = 1920
@@ -39,8 +42,11 @@ def pix_to_complex(pos):
 
 def f(x):
     current = np.full(x.shape, np.complex128(1))
-    for root in roots:
-        current *= (x - root.complex)
+    #for root in roots:
+        #current *= numexpr.evaluate('x - root', local_dict={'root': root.complex, 'x': x})
+        #current *= (x - root.complex)
+        #current = np.multiply(current, (x - root.complex))
+    current = numexpr.evaluate('current * (x - roots)', local_dict={'roots': roots[0].complex, 'x': x, 'current': current})
     return current
 
 
@@ -48,7 +54,7 @@ def f_prime(x):
     # returns the derivative of f(x) where f is a polynomial
     current = np.full(x.shape, np.complex128(0))
     for root in roots:
-        current += f(x) / (x - root.complex)
+        current += f(x) / numexpr.evaluate('(x - root)', local_dict={'root': root.complex, 'x': x})
     return current
 
 
@@ -57,6 +63,7 @@ active = False
 
 
 def render(scale=None):
+    start = perf_counter()
     global fractal_surface, scaled_fractal_surface
     # display "rendering" to the user
     text = large_font.render(
@@ -81,15 +88,13 @@ def render(scale=None):
 
     # calculate the fractal
     for i in range(ITERATIONS):
-        if calculated.all():
-            break
+
         not_calculated = np.logical_not(calculated)
         c[not_calculated] = c[not_calculated] - \
             f(c[not_calculated]) / f_prime(c[not_calculated])
         for root in roots:
             # if the root is close enough, set the color (only for non-calculated points)
-            distances[not_calculated] = np.abs(
-                c[not_calculated] - root.complex)
+            distances[not_calculated] = numexpr.evaluate('abs(c - root)', local_dict={'root': root.complex, 'c': c[not_calculated]})
             mask[not_calculated] = distances[not_calculated] < 4e-2
             color_mask = np.logical_and(mask, not_calculated)
             # make the color darker based on how many iterations it took to find the root
@@ -151,6 +156,9 @@ def render(scale=None):
     fractal_surface = pg.surfarray.make_surface(tcolors)
     scaled_fractal_surface = pg.transform.scale(
         fractal_surface, (WIDTH, HEIGHT))
+    
+    end = perf_counter()
+    print("Rendered in", end-start, "seconds")
 
 
 def hsv_to_rgb(h, s, v):
@@ -538,6 +546,10 @@ while running:
             screen.blit(text, text_rect)
 
     # display fps
+    text = large_font.render(
+        f"FPS: {round(clock.get_fps())}", True, (255, 255, 255))
+    screen.blit(text, (WIDTH - text.get_width(), 0))
+    
     clock.tick()
     pg.display.flip()
 
