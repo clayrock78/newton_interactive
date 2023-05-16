@@ -11,4 +11,4 @@ Make sure you have numpy and pygame. Run the program and press CTRL to see contr
 
 ![image](https://user-images.githubusercontent.com/92127094/234312776-77c51adf-9393-4a05-89fe-ad5c5ab8f5f9.png)
 
-![image](https://user-images.githubusercontent.com/92127094/234312979-8916c4c0-7652-4dad-9f13-c801fe10ea79.png)
+![image](https://user-images.githubusercontent.com/92127094/234589491-5019bbb3-158c-43de-a93d-2e7bcdc6f823.png)
